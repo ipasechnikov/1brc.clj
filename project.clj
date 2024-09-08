@@ -6,4 +6,6 @@
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [com.taoensso/tufte "2.6.3"]]
   :repl-options {:init-ns onebrc.core}
-  :java-source-paths ["src/onebrc/java"])
+  :java-source-paths ["src/onebrc/java"]
+  :plugins [[io.taylorwood/lein-native-image "0.3.1"]]
+  :main onebrc.core)

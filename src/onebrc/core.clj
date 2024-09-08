@@ -2,8 +2,11 @@
   (:require [clojure.string :as str]
             [taoensso.tufte :as tufte :refer [p profile]])
   (:import onebrc.java.ByteArrayToResultMap
-           onebrc.java.Result))
+           onebrc.java.Result)
+  (:gen-class))
 
+
+(set! *warn-on-reflection* false)
 (tufte/add-basic-println-handler! {})
 
 
@@ -53,14 +56,14 @@
                     (.flip))
                   (recur))))))))))
 
-(defn request-next-chunk
-  [^java.nio.channels.FileChannel file-channel chunk-offset chunk-size]
-  (let [next-chunk (atom nil)]
-    (locking chunk-offset
-      (when-let [^java.nio.ByteBuffer chunk (get-newline-aligned-chunk file-channel @chunk-offset chunk-size)]
-        (reset! next-chunk chunk)
-        (swap! chunk-offset + (.limit chunk))))
-    @next-chunk))
+(defn get-all-chunks
+  [^java.nio.channels.FileChannel file-channel chunk-size]
+  (loop [chunks (transient [])
+         chunk-offset 0]
+    (if-let [^java.nio.ByteBuffer next-chunk (get-newline-aligned-chunk file-channel chunk-offset chunk-size)]
+      (recur (conj! chunks next-chunk)
+             (+ chunk-offset (.limit next-chunk)))
+      (persistent! chunks))))
 
 (comment
   (let [file-channel (open-file-channel "../1brc.data/measurements-10.txt")
@@ -71,11 +74,10 @@
     chunk)
 
   (let [file-channel (open-file-channel "../1brc.data/measurements-10.txt")
-        chunk-offset (atom 0)
         chunk-size 64
-        chunk (request-next-chunk file-channel chunk-offset chunk-size)]
+        chunks (get-all-chunks file-channel chunk-size)]
     (close-file-channel file-channel)
-    chunk)
+    chunks)
   :rcf)
 
 
@@ -124,9 +126,8 @@
   ;; => ["Halifax" 12.9]
 
   (let [file-channel (open-file-channel "../1brc.data/measurements-10.txt")
-        chunk-offset (atom 0)
         chunk-size 64
-        chunk (request-next-chunk file-channel chunk-offset chunk-size)]
+        chunk (first (get-all-chunks file-channel chunk-size))]
     (println (read-name chunk (java.nio.ByteBuffer/allocate name-max-length)))
     (println (read-temp chunk))
     (close-file-channel file-channel))
@@ -134,67 +135,49 @@
 
 
 (defn process-chunk
-  [^java.nio.ByteBuffer byte-buffer ^java.nio.ByteBuffer name-buffer ^ByteArrayToResultMap results]
-  (while (.hasRemaining byte-buffer)
-    (read-name byte-buffer name-buffer)
-    (.upsert results (.array name-buffer) (.limit name-buffer) (read-temp byte-buffer)))
-  results)
-
-(comment
-  (let [file-channel (open-file-channel "../1brc.data/measurements-10.txt")
-        chunk-offset (atom 0)
-        chunk-size 64
-        chunk (request-next-chunk file-channel chunk-offset chunk-size)
-        name-buffer (java.nio.ByteBuffer/allocate name-max-length)
-        results (ByteArrayToResultMap.)]
-    (process-chunk chunk name-buffer results)
-    (close-file-channel file-channel)
-    results)
-  :rcf)
-
-
-(defn do-work
-  [^java.nio.channels.FileChannel file-channel chunk-offset chunk-size]
-  (let [name-buffer (java.nio.ByteBuffer/allocate name-max-length)
-        results (ByteArrayToResultMap.)]
-    (loop []
-      (when-let [chunk (request-next-chunk file-channel chunk-offset chunk-size)]
-        (process-chunk chunk name-buffer results)
-        (recur)))
+  [^java.nio.ByteBuffer byte-buffer]
+  (let [results (ByteArrayToResultMap.)
+        name-buffer (java.nio.ByteBuffer/allocate name-max-length)]
+    (while (.hasRemaining byte-buffer)
+      (read-name byte-buffer name-buffer)
+      (.upsert results (.array name-buffer) (.limit name-buffer) (read-temp byte-buffer)))
     results))
 
 (comment
+  (let [file-channel (open-file-channel "../1brc.data/measurements-10.txt")
+        chunk-size 64
+        chunk (first (get-all-chunks file-channel chunk-size))
+        results (process-chunk chunk)]
+    (close-file-channel file-channel)
+    results)
+
   (time
    (let [file-channel (open-file-channel "../1brc.data/measurements-10000000.txt")
-         chunk-offset (atom 0)
-         chunk-size (* 2 1024 1024)]
-     (do-work file-channel chunk-offset chunk-size)
-     (close-file-channel file-channel)))
-
-  (profile
-   {}
-   (let [file-channel (open-file-channel "../1brc.data/measurements-10000000.txt")
-         chunk-offset (atom 0)
-         chunk-size (* 2 1024 1024)]
-     (p ::do-work
-        (do-work file-channel chunk-offset chunk-size))
+         chunk-size (* 2 1024 1024)
+         chunk (first (get-all-chunks file-channel chunk-size))]
+     (process-chunk chunk)
      (close-file-channel file-channel)))
   :rcf)
 
 
 (defn merge-and-sort
   [results]
-  (reduce (fn [^java.util.TreeMap acc worker-results]
-            (doseq [^java.util.AbstractMap$SimpleEntry entry ^java.util.List worker-results]
-              (let [^String name (.getKey entry)
-                    ^Result new-result (.getValue entry)]
-                (if-let [^Result old-result (.get acc name)]
-                  (.merge old-result new-result)
-                  (.put acc name new-result))))
-            acc)
-          (java.util.TreeMap.)
-          (map (fn [^ByteArrayToResultMap r] (.getAllResults r))
-               results)))
+  (into (sorted-map)
+        (persistent!
+         (reduce (fn [acc ^java.util.List worker-results]
+                   (reduce (fn [acc ^java.util.AbstractMap$SimpleEntry entry]
+                             (let [^String name (.getKey entry)
+                                   ^Result new-result (.getValue entry)]
+                               (if-let [^Result old-result (get acc name)]
+                                 (do
+                                   (.merge old-result new-result)
+                                   acc)
+                                 (assoc! acc name new-result))))
+                           acc
+                           worker-results))
+                 (transient {})
+                 (map (fn [^ByteArrayToResultMap r] (.getAllResults r))
+                      results)))))
 
 (defn results->string
   [^java.util.TreeMap results]
@@ -215,12 +198,26 @@
       (.append \}))
     (.toString sb)))
 
+(comment
+  (profile
+   {}
+   (let [file-path "../1brc.data/measurements-10000000.txt"
+         file-channel (open-file-channel file-path)
+         chunk-size (* 2 1024 1024)
+         chunks (p ::get-all-chunks (doall (get-all-chunks file-channel chunk-size)))
+         worker-results (mapv process-chunk chunks)
+         sorted-results (merge-and-sort worker-results)
+         output-string (results->string sorted-results)]
+     (close-file-channel file-channel)
+     (count output-string)))
+  :rcf)
+
+
 (defn run-workers
-  [file-path chunk-size number-of-workers]
+  [file-path chunk-size]
   (let [file-channel (open-file-channel file-path)
-        chunk-offset (atom 0)
-        worker-futures (doall (repeatedly number-of-workers #(future (do-work file-channel chunk-offset chunk-size))))
-        worker-results (doall (map #(deref %) worker-futures))
+        chunks (get-all-chunks file-channel chunk-size)
+        worker-results (pmap process-chunk chunks)
         sorted-results (merge-and-sort worker-results)
         output-string (results->string sorted-results)]
     (close-file-channel file-channel)
@@ -230,10 +227,21 @@
   (time
    (let [file-path "../1brc.data/measurements-1000000000.txt"
          chunk-size (* 256 1024 1024)
-         number-of-workers (.availableProcessors (java.lang.Runtime/getRuntime))
-         actual-results (run-workers file-path chunk-size number-of-workers)
+         actual-results (run-workers file-path chunk-size)
          expect-results (str/trim-newline (slurp "../1brc.data/measurements-1000000000.out"))]
     ;;  (println "Expect:" expect-results)
     ;;  (println "Actual:" actual-results)
      (println "Results match:" (= actual-results expect-results))))
   :rcf)
+
+
+(defn -main
+  [& args]
+  (time
+   (let [file-path "../1brc.data/measurements-1000000000.txt"
+         chunk-size (* 256 1024 1024)
+         actual-results (run-workers file-path chunk-size)
+         expect-results (str/trim-newline (slurp "../1brc.data/measurements-1000000000.out"))]
+     (println "Results match:" (= actual-results expect-results))))
+  (shutdown-agents))
+ 
