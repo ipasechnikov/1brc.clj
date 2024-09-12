@@ -8,4 +8,10 @@
   :repl-options {:init-ns onebrc.core}
   :java-source-paths ["src/onebrc/java"]
   :plugins [[io.taylorwood/lein-native-image "0.3.1"]]
-  :main onebrc.core)
+  :native-image {:opts ["-O3"
+                        "-march=native"
+                        "--report-unsupported-elements-at-runtime"
+                        "--initialize-at-build-time"
+                        "--no-fallback"]}
+  :profiles {:uberjar {:aot :all}}
+  :main ^:skip-aot onebrc.core)
