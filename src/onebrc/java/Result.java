@@ -16,23 +16,15 @@ public class Result {
     public void add(final int temp) {
         cnt++;
         sum += temp;
-        min = branchlessMin(min, temp);
-        max = branchlessMax(max, temp);
+        min = BitwiseHelpers.branchlessMin(min, temp);
+        max = BitwiseHelpers.branchlessMax(max, temp);
     }
 
     public void merge(final Result other) {
         sum += other.sum;
         cnt += other.cnt;
-        min = branchlessMin(min, other.min);
-        max = branchlessMax(max, other.max);
-    }
-
-    private int branchlessMin(final int a, final int b) {
-        return b + ((a - b) & ((a - b) >> 31));
-    }
-
-    private int branchlessMax(final int a, final int b) {
-        return a - ((a - b) & ((a - b) >> 31));
+        min = BitwiseHelpers.branchlessMin(min, other.min);
+        max = BitwiseHelpers.branchlessMax(max, other.max);
     }
 
     private double round(final double value) {

@@ -75,9 +75,19 @@ public class ByteArrayToResultMap {
 
     private int djb2(final ByteBuffer key) {
         int hash = 5381;
+
+        while (key.remaining() >= Integer.BYTES) {
+            hash = 33 * 33 * 33 * 33 * hash
+                    + 33 * 33 * 33 * key.get()
+                    + 33 * 33 * key.get()
+                    + 33 * key.get()
+                    + key.get();
+        }
+
         while (key.hasRemaining()) {
             hash = hash * 33 + key.get();
         }
+
         key.rewind();
         return hash;
     }

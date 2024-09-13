@@ -4,7 +4,7 @@
   (:import onebrc.java.ByteArrayToResultMap
            onebrc.java.Result
            onebrc.java.ChunkedFile
-           onebrc.java.ChunkedFileReader)
+           onebrc.java.ChunkReader)
   (:gen-class))
 
 
@@ -13,13 +13,16 @@
 
 
 (defn do-work
-  [chunked-file]
-  (let [chunked-file-reader (ChunkedFileReader. chunked-file)
-        results (ByteArrayToResultMap.)]
-    (while (.hasRemaining chunked-file-reader)
-      (let [name (.readName chunked-file-reader)
-            temp (.readTemp chunked-file-reader)]
-        (.upsert results name temp)))
+  [^ChunkedFile chunked-file]
+  (let [chunk-reader (ChunkReader.)
+        results (ByteArrayToResultMap. (* 1024 128))]
+    (loop []
+      (when-let [^java.nio.ByteBuffer chunk (.getNextChunk chunked-file)]
+        (while (.hasRemaining chunk)
+          (let [name (.readNameBatched chunk-reader chunk)
+                temp (.readTempBatched chunk-reader chunk)]
+            (.upsert results name temp)))
+        (recur)))
     results))
 
 (defn merge-and-sort
