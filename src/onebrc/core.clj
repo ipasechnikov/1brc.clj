@@ -1,26 +1,21 @@
 (ns onebrc.core
-  (:require [clojure.string :as str]
-            [taoensso.tufte :as tufte :refer [p profile]])
+  (:require [clojure.string :as str])
   (:import onebrc.java.ByteArrayToResultMap
-           onebrc.java.Result
            onebrc.java.ChunkedFile
-           onebrc.java.ChunkReader)
+           onebrc.java.ChunkReader
+           onebrc.java.Result)
   (:gen-class))
-
-
-(set! *warn-on-reflection* false)
-(tufte/add-basic-println-handler! {})
 
 
 (defn do-work
   [^ChunkedFile chunked-file]
   (let [chunk-reader (ChunkReader.)
-        results (ByteArrayToResultMap. (* 1024 128))]
+        results (ByteArrayToResultMap.)]
     (loop []
       (when-let [^java.nio.ByteBuffer chunk (.getNextChunk chunked-file)]
         (while (.hasRemaining chunk)
-          (let [name (.readNameBatched chunk-reader chunk)
-                temp (.readTempBatched chunk-reader chunk)]
+          (let [name (.readName chunk-reader chunk)
+                temp (.readTemp chunk-reader chunk)]
             (.upsert results name temp)))
         (recur)))
     results))
@@ -65,7 +60,7 @@
   [& args]
   (time
    (let [file-path "../1brc.data/measurements-1000000000.txt"
-         chunk-size (* 256 1024 1024)
+         chunk-size (* 32 1024 1024)
          number-of-workers (+ 2 (.availableProcessors (Runtime/getRuntime)))
          worker-results (run-workers file-path chunk-size number-of-workers)
          actual-results (results->string worker-results)

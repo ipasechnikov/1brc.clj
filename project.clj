@@ -3,15 +3,9 @@
   :url "http://example.com/FIXME"
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"
             :url "https://www.eclipse.org/legal/epl-2.0/"}
-  :dependencies [[org.clojure/clojure "1.11.1"]
-                 [com.taoensso/tufte "2.6.3"]]
+  :dependencies [[org.clojure/clojure "1.11.1"]]
   :repl-options {:init-ns onebrc.core}
   :java-source-paths ["src/onebrc/java"]
   :plugins [[io.taylorwood/lein-native-image "0.3.1"]]
-  :native-image {:opts ["-O3"
-                        "-march=native"
-                        "--report-unsupported-elements-at-runtime"
-                        "--initialize-at-build-time"
-                        "--no-fallback"]}
   :profiles {:uberjar {:aot :all}}
-  :main ^:skip-aot onebrc.core)
+  :main onebrc.core)
