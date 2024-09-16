@@ -7,17 +7,14 @@
   (:gen-class))
 
 
-(defn do-work
-  [^ChunkedFile chunked-file]
-  (let [chunk-reader (ChunkReader.)
-        results (ByteArrayToResultMap.)]
-    (loop []
-      (when-let [^java.nio.ByteBuffer chunk (.getNextChunk chunked-file)]
-        (while (.hasRemaining chunk)
-          (let [name (.readNameBatched chunk-reader chunk)
-                temp (.readTemp chunk-reader chunk)]
-            (.upsert results name temp)))
-        (recur)))
+(defn process-chunk
+  [^java.nio.ByteBuffer chunk]
+  (let [results (ByteArrayToResultMap.)
+        chunk-reader (ChunkReader.)]
+    (while (.hasRemaining chunk)
+      (let [name (.readName chunk-reader chunk)
+            temp (.readTemp chunk-reader chunk)]
+        (.upsert results name temp)))
     results))
 
 (defn merge-and-sort
@@ -40,12 +37,11 @@
                       results)))))
 
 (defn run-workers
-  [file-path chunk-size number-of-workers]
+  [file-path chunk-size]
   (with-open [chunked-file (ChunkedFile. file-path chunk-size)]
-    (let [worker-futures (doall (repeatedly number-of-workers #(future (do-work chunked-file))))
-          worker-results (mapv deref worker-futures)
-          merged-results (merge-and-sort worker-results)]
-      merged-results)))
+    (->> (.getAllChunks chunked-file)
+         (pmap process-chunk)
+         (merge-and-sort))))
 
 (defn results->string
   [^java.util.TreeMap results]
@@ -61,8 +57,7 @@
   (time
    (let [file-path "../1brc.data/measurements-1000000000.txt"
          chunk-size (* 32 1024 1024)
-         number-of-workers (+ 2 (.availableProcessors (Runtime/getRuntime)))
-         worker-results (run-workers file-path chunk-size number-of-workers)
+         worker-results (run-workers file-path chunk-size)
          actual-results (results->string worker-results)
          expect-results (str/trim-newline (slurp "../1brc.data/measurements-1000000000.out"))]
     ;;  (println "Expect:" expect-results)

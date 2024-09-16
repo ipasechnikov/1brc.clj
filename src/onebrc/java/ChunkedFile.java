@@ -7,6 +7,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 
 public class ChunkedFile implements Closeable {
     private static final int NAME_MAX_LEN = 100;
@@ -26,6 +27,14 @@ public class ChunkedFile implements Closeable {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public ArrayList<MappedByteBuffer> getAllChunks() {
+        final ArrayList<MappedByteBuffer> allChunks = new ArrayList<>();
+        for (MappedByteBuffer chunk = getNextChunk(); chunk != null; chunk = getNextChunk()) {
+            allChunks.add(chunk);
+        }
+        return allChunks;
     }
 
     public synchronized MappedByteBuffer getNextChunk() {

@@ -28,11 +28,31 @@ public class BitwiseHelpers {
 
     public static int indexOf(final int searchIn, final byte searchFor) {
         final int searchForInt = (int) searchFor;
-        final int searchForMask = (searchForInt << 24) | (searchForInt << 16) | (searchForInt << 8) | searchForInt;
+        final int searchForMask = (searchForInt << 24)
+                | (searchForInt << 16)
+                | (searchForInt << 8)
+                | searchForInt;
 
         final int xorResult = searchIn ^ searchForMask;
-        final int searchInMasked = (xorResult - 0x01_01_01_01) & ~xorResult & 0x80_80_80_80;
+        final int searchInMasked = (xorResult - 0x01010101) & ~xorResult & 0x80808080;
 
-        return (Integer.BYTES - 1) - (Integer.numberOfTrailingZeros(searchInMasked) / 8);
+        return (Integer.BYTES - 1) - (Integer.numberOfTrailingZeros(searchInMasked) / Byte.SIZE);
+    }
+
+    public static int indexOf(final long searchIn, final byte searchFor) {
+        final long searchForLong = (long) searchFor;
+        final long searchForMask = (searchForLong << 56)
+                | (searchForLong << 48)
+                | (searchForLong << 40)
+                | (searchForLong << 32)
+                | (searchForLong << 24)
+                | (searchForLong << 16)
+                | (searchForLong << 8)
+                | searchForLong;
+
+        final long xorResult = searchIn ^ searchForMask;
+        final long searchInMasked = (xorResult - 0x0101010101010101L) & ~xorResult & 0x8080808080808080L;
+
+        return (Long.BYTES - 1) - (Long.numberOfTrailingZeros(searchInMasked) / Byte.SIZE);
     }
 }

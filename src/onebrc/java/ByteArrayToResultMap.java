@@ -3,18 +3,19 @@ package onebrc.java;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.AbstractMap.SimpleEntry;
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 
 // Based on the implementation from Sam Pullara
 // https://github.com/gunnarmorling/1brc/blob/db064194be375edc02d6dbcd21268ad40f7e2869/src/main/java/dev/morling/onebrc/CalculateAverage_spullara.java#L174
 public class ByteArrayToResultMap {
     private static final int DEFAULT_CAPACITY = 1024 * 16;
+
     private final Result[] slots;
     private final byte[][] keys;
-    private final int[] hashes;
-    private final List<SimpleEntry<String, Result>> allResults = new ArrayList<>();
+    private final int[] hashCache;
+    private final List<SimpleEntry<String, Result>> allResults = new LinkedList<>();
 
     public ByteArrayToResultMap() {
         this(DEFAULT_CAPACITY);
@@ -23,24 +24,21 @@ public class ByteArrayToResultMap {
     public ByteArrayToResultMap(int capacity) {
         slots = new Result[capacity];
         keys = new byte[capacity][];
-        hashes = new int[capacity];
+        hashCache = new int[capacity];
     }
 
     public void upsert(final ByteBuffer key, final int temp) {
+        final int keyLength = key.limit();
         final int hash = djb2(key);
         int slotIndex = hash & (slots.length - 1);
         Result slotValue = slots[slotIndex];
 
-        while (true) {
-            if (slotValue == null) {
-                break;
-            }
-
-            final int existingKeyHash = hashes[slotIndex];
+        while (slotValue != null) {
+            final int existingKeyHash = hashCache[slotIndex];
             if (hash == existingKeyHash) {
                 final byte[] existingKey = keys[slotIndex];
-                final boolean isKeyMatch = existingKey.length == key.limit() &&
-                        Arrays.equals(key.array(), key.position(), key.limit(), existingKey, 0, existingKey.length);
+                final boolean isKeyMatch = existingKey.length == keyLength &&
+                        Arrays.equals(key.array(), 0, keyLength, existingKey, 0, existingKey.length);
 
                 if (isKeyMatch) {
                     break;
@@ -52,14 +50,13 @@ public class ByteArrayToResultMap {
         }
 
         if (slotValue == null) {
-            hashes[slotIndex] = hash;
+            hashCache[slotIndex] = hash;
 
             final Result newValue = new Result(temp);
             slots[slotIndex] = newValue;
 
-            final byte[] newKey = new byte[key.remaining()];
-            key.get(newKey);
-            key.rewind();
+            final byte[] newKey = new byte[keyLength];
+            key.rewind().get(newKey);
             keys[slotIndex] = newKey;
 
             final String newKeyStr = new String(newKey, StandardCharsets.UTF_8);
@@ -74,36 +71,14 @@ public class ByteArrayToResultMap {
     }
 
     private int djb2(final ByteBuffer key) {
-        // Unlooped version of djb2 hash processing up to 8 bytes per iteration
-        // https://lemire.me/blog/2015/10/22/faster-hashing-without-effort/
+        final byte[] keyArr = key.array();
+        final int keyLen = key.limit();
 
         int hash = 5381;
-
-        while (key.remaining() >= Long.BYTES) {
-            hash = 33 * 33 * 33 * 33 * 33 * 33 * 33 * 33 * hash
-                    + 33 * 33 * 33 * 33 * 33 * 33 * 33 * key.get()
-                    + 33 * 33 * 33 * 33 * 33 * 33 * key.get()
-                    + 33 * 33 * 33 * 33 * 33 * key.get()
-                    + 33 * 33 * 33 * 33 * key.get()
-                    + 33 * 33 * 33 * key.get()
-                    + 33 * 33 * key.get()
-                    + 33 * key.get()
-                    + key.get();
+        for (int i = 0; i < keyLen; i++) {
+            hash = (hash * 33) + keyArr[i];
         }
 
-        while (key.remaining() >= Integer.BYTES) {
-            hash = 33 * 33 * 33 * 33 * hash
-                    + 33 * 33 * 33 * key.get()
-                    + 33 * 33 * key.get()
-                    + 33 * key.get()
-                    + key.get();
-        }
-
-        while (key.hasRemaining()) {
-            hash = hash * 33 + key.get();
-        }
-
-        key.rewind();
         return hash;
     }
 }
