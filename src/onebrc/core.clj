@@ -14,7 +14,7 @@
     (loop []
       (when-let [^java.nio.ByteBuffer chunk (.getNextChunk chunked-file)]
         (while (.hasRemaining chunk)
-          (let [name (.readName chunk-reader chunk)
+          (let [name (.readNameBatched chunk-reader chunk)
                 temp (.readTemp chunk-reader chunk)]
             (.upsert results name temp)))
         (recur)))
@@ -69,4 +69,3 @@
     ;;  (println "Actual:" actual-results)
      (println "Results match:" (= actual-results expect-results))))
   (shutdown-agents))
- 

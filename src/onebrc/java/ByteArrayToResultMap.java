@@ -74,7 +74,22 @@ public class ByteArrayToResultMap {
     }
 
     private int djb2(final ByteBuffer key) {
+        // Unlooped version of djb2 hash processing up to 8 bytes per iteration
+        // https://lemire.me/blog/2015/10/22/faster-hashing-without-effort/
+
         int hash = 5381;
+
+        while (key.remaining() >= Long.BYTES) {
+            hash = 33 * 33 * 33 * 33 * 33 * 33 * 33 * 33 * hash
+                    + 33 * 33 * 33 * 33 * 33 * 33 * 33 * key.get()
+                    + 33 * 33 * 33 * 33 * 33 * 33 * key.get()
+                    + 33 * 33 * 33 * 33 * 33 * key.get()
+                    + 33 * 33 * 33 * 33 * key.get()
+                    + 33 * 33 * 33 * key.get()
+                    + 33 * 33 * key.get()
+                    + 33 * key.get()
+                    + key.get();
+        }
 
         while (key.remaining() >= Integer.BYTES) {
             hash = 33 * 33 * 33 * 33 * hash

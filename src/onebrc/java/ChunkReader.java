@@ -22,26 +22,20 @@ public class ChunkReader {
     public ByteBuffer readNameBatched(final ByteBuffer chunk) {
         nameBuffer.clear();
 
-        final byte[] nameBufArr = nameBuffer.array();
-        int nameBufPos = nameBuffer.position();
-
+        int nameLength = nameBuffer.position();
         while (true) {
-            chunk.get(nameBufArr, nameBufPos, Integer.BYTES);
-            final int nameBytes = (nameBufArr[nameBufPos] << 24)
-                    | (nameBufArr[nameBufPos + 1] << 16)
-                    | (nameBufArr[nameBufPos + 2] << 8)
-                    | nameBufArr[nameBufPos + 3];
+            final int nameBytes = chunk.getInt();
+            final int separatorPos = BitwiseHelpers.indexOf(nameBytes, (byte) ';');
+            nameBuffer.putInt(nameLength, nameBytes);
 
-            final int separatorPos = BitwiseHelpers.findBytePosition(nameBytes, (byte) ';');
-
-            if (separatorPos == 0) {
-                nameBufPos += Integer.BYTES;
+            if (separatorPos == -1) {
+                nameLength += Integer.BYTES;
             } else {
-                nameBufPos += separatorPos - 1;
-                nameBuffer.position(nameBufPos);
+                nameLength += separatorPos;
+                nameBuffer.position(nameLength);
                 nameBuffer.flip();
 
-                final int nReturnBytes = Integer.BYTES - separatorPos;
+                final int nReturnBytes = (Integer.BYTES - 1) - separatorPos;
                 chunk.position(chunk.position() - nReturnBytes);
                 break;
             }
@@ -51,20 +45,19 @@ public class ChunkReader {
     }
 
     public int readTemp(final ByteBuffer chunk) {
-        int sign = 1;
-        int temp = 0;
+        final byte firstByte = chunk.get();
+        final int isNegative = BitwiseHelpers.isEqual(firstByte, (byte) '-');
+        final int sign = 1 - (2 * isNegative);
+
+        final int isPositive = BitwiseHelpers.logicalNot(isNegative);
+        int temp = (firstByte - '0') * isPositive;
+
         for (byte b = chunk.get(); b != '\n'; b = chunk.get()) {
-            switch (b) {
-                case '-':
-                    sign = -1;
-                    break;
-                case '.':
-                    break;
-                default:
-                    temp = (temp * 10) + (b - '0');
-                    break;
-            }
+            final int isDigit = BitwiseHelpers.isDigit(b);
+            temp *= 1 + (isDigit * 9);
+            temp += (b - '0') * isDigit;
         }
+
         return temp * sign;
     }
 
