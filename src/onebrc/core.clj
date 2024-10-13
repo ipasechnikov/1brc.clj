@@ -33,34 +33,54 @@
                            acc
                            worker-results))
                  (transient {})
-                 (map (fn [^ByteArrayToResultMap m] (.getAllResults m))
+                 (map (fn [^ByteArrayToResultMap m]
+                        (.getAllResults m))
                       results)))))
 
-(defn run-workers
-  [file-path chunk-size]
-  (with-open [chunked-file (ChunkedFile. file-path chunk-size)]
-    (->> (.getAllChunks chunked-file)
-         (pmap process-chunk)
-         (merge-and-sort))))
-
 (defn results->string
-  [^java.util.TreeMap results]
+  [results]
   (str "{"
        (str/join
         ", "
-        (map (fn [[name result]] (str name "=" result))
+        (map (fn [[name result]]
+               (str name "=" result))
              results))
        "}"))
 
+(defn optimal-chunk-size
+  [file-path]
+  (let [number-of-threads (+ (.availableProcessors (Runtime/getRuntime)) 2)
+        min-chunk-size (* 2 1024 1024)
+        max-chunk-size (* 32 1024 1024)
+        file-size (java.nio.file.Files/size
+                   (java.nio.file.Paths/get file-path (into-array String [])))]
+    (min
+     (max (/ file-size number-of-threads) min-chunk-size)
+     max-chunk-size)))
+
+(defn calculate-averages
+  [file-path]
+  (let [chunk-size (optimal-chunk-size file-path)]
+    (with-open [chunked-file (ChunkedFile. file-path chunk-size)]
+      (->> (.getAllChunks chunked-file)
+           (pmap process-chunk)
+           (merge-and-sort)
+           (results->string)))))
+
 (defn -main
   [& args]
-  (time
-   (let [file-path "../1brc.data/measurements-1000000000.txt"
-         chunk-size (* 32 1024 1024)
-         worker-results (run-workers file-path chunk-size)
-         actual-results (results->string worker-results)
-         expect-results (str/trim-newline (slurp "../1brc.data/measurements-1000000000.out"))]
-    ;;  (println "Expect:" expect-results)
-    ;;  (println "Actual:" actual-results)
-     (println "Results match:" (= actual-results expect-results))))
+  (->> "measurements.txt"
+       (calculate-averages)
+       (println))
   (shutdown-agents))
+
+;; (defn -main
+;;   [& args]
+;;   (time
+;;    (let [file-path "../1brc.data/measurements-1000000000.txt"
+;;          actual-results (calculate-averages file-path)
+;;          expect-results (str/trim-newline (slurp "../1brc.data/measurements-1000000000.out"))]
+;;         ;;  (println "Expect:" expect-results)
+;;         ;;  (println "Actual:" actual-results)
+;;      (println "Results match:" (= actual-results expect-results))))
+;;   (shutdown-agents))

@@ -1,0 +1,4 @@
+lein linguist-vendored
+*.sh linguist-vendored
+*.bat linguist-vendored
+*.cmd linguist-vendored
