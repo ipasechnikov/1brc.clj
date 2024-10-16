@@ -248,7 +248,7 @@ compilation flags (can be found in `project.clj` file).
 
 ## 📝 TODOs
 
-- [ ] Reimplement `ChunkedFile` in Clojure \
+- [x] Reimplement `ChunkedFile` in Clojure \
   *No noticeable performance hit expected*
 - [ ] Reimplement `BitwiseHelpers` in Clojure \
   *No noticeable performance hit expected*
