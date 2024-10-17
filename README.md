@@ -250,8 +250,9 @@ compilation flags (can be found in `project.clj` file).
 
 - [x] Reimplement `ChunkedFile` in Clojure \
   *No noticeable performance hit expected*
-- [ ] Reimplement `BitwiseHelpers` in Clojure \
-  *No noticeable performance hit expected*
+- [ ] ~~Reimplement `BitwiseHelpers` in Clojure~~ \
+  *No noticeable performance hit expected* \
+  **Some Java classes like `ChunkReader` depend on it. No point it reimplementing it in Clojure**
 - [ ] ~~Reimplement `ChunkReader` in Clojure~~ \
   *Potential performance degradation. Proceed carefully* \
   **As expected, didn't work out well. 2-3 times performance hit. Keeping `ChunkReader` as is**
