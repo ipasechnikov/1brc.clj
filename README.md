@@ -258,4 +258,6 @@ compilation flags (can be found in `project.clj` file).
   **As expected, didn't work out well. 2-3 times performance hit. Keeping `ChunkReader` as is**
 - [ ] [Optional] Reimplement `Result` in Clojure \
   *Might be difficult or non-obvious because of mutable nature of `Result` class*
-- [ ] [Optional] Challenge myself implementing a hashmap in Clojure
+- [ ] [Optional] ~~Challenge myself implementing a hashmap in Clojure~~ \
+  **Total fail. Reimplementing even a simple `djb2` in Clojure resulted in two orders of magnitude (!) of performance drop,
+  100-200 times slower. After that I dropped the idea of implementing hashmap in Clojure completely**
