@@ -252,8 +252,9 @@ compilation flags (can be found in `project.clj` file).
   *No noticeable performance hit expected*
 - [ ] Reimplement `BitwiseHelpers` in Clojure \
   *No noticeable performance hit expected*
-- [ ] Reimplement `ChunkReader` in Clojure \
-  *Potential performance degradation. Proceed carefully*
+- [ ] ~~Reimplement `ChunkReader` in Clojure~~ \
+  *Potential performance degradation. Proceed carefully* \
+  **As expected, didn't work out well. 2-3 times performance hit. Keeping `ChunkReader` as is**
 - [ ] [Optional] Reimplement `Result` in Clojure \
   *Might be difficult or non-obvious because of mutable nature of `Result` class*
 - [ ] [Optional] Challenge myself implementing a hashmap in Clojure

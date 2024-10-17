@@ -114,7 +114,6 @@
 
 
 (comment
-
   ;; A left-over template code for benchmarking in case I need it in the future for some reason
 
   (require '[criterium.core :as criterium])
@@ -123,11 +122,19 @@
    (let [measurements-txt "../1brc.data/measurements-1000000.txt"]
      (calculate-averages measurements-txt)))
 
+  (let [entry "Cabo San Lucas;14.9"
+        entry-buffer (java.nio.ByteBuffer/wrap
+                      (.getBytes entry java.nio.charset.StandardCharsets/UTF_8))
+        chunk-reader (ChunkReader.)]
+    (criterium/quick-bench
+     (do
+       (.rewind entry-buffer)
+       (.readName chunk-reader entry-buffer))))
+
   :rcf)
 
 
 (comment
-
   ;; A quick way to check if "calculate-averages" function works correctly
 
   (time
@@ -138,4 +145,3 @@
      (println "Results match:" (= actual-results expect-results))))
 
   :rcf)
-
