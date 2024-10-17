@@ -256,8 +256,10 @@ compilation flags (can be found in `project.clj` file).
 - [ ] ~~Reimplement `ChunkReader` in Clojure~~ \
   *Potential performance degradation. Proceed carefully* \
   **As expected, didn't work out well. 2-3 times performance hit. Keeping `ChunkReader` as is**
-- [ ] [Optional] Reimplement `Result` in Clojure \
-  *Might be difficult or non-obvious because of mutable nature of `Result` class*
+- [ ] [Optional] ~~Reimplement `Result` in Clojure~~ \
+  *Might be difficult or non-obvious because of mutable nature of `Result` class* \
+  **Won't do. `Result` is used only by hashmap implemented in Java. Because hashmap implementation in Clojure failed,
+  it doesn't make much sense to reimplement `Result`**
 - [ ] [Optional] ~~Challenge myself implementing a hashmap in Clojure~~ \
   **Total fail. Reimplementing even a simple `djb2` in Clojure resulted in two orders of magnitude (!) of performance drop,
   100-200 times slower. After that I dropped the idea of implementing hashmap in Clojure completely**
